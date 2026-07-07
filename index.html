@@ -233,6 +233,11 @@ thead{position:sticky;top:0;z-index:10}
     <option value="redflag">Red Flags</option>
   </select>
 
+  <label>Close Date</label>
+  <select id="fClose">
+    <option value="">All Dates</option>
+  </select>
+
   <input type="text" id="fSearch" placeholder="Search opp / account / AE..." style="width:220px">
   <button class="btn-reset" onclick="resetFilters()">Reset Filters</button>
 </div>
@@ -336,6 +341,58 @@ function populateStageFilter(){
   stages.forEach(s=>{ const o=document.createElement("option"); o.value=s; o.textContent=s; sf.appendChild(o); });
 }
 
+function populateCloseFilter(){
+  const sel = document.getElementById("fClose");
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-indexed
+
+  // --- Monthly options (next 6 months) ---
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const grpM = document.createElement("optgroup");
+  grpM.label = "Monthly";
+  for(let i=0; i<6; i++){
+    const d = new Date(y, m+i, 1);
+    const dy = d.getFullYear(), dm = d.getMonth();
+    const start = dy+"-"+String(dm+1).padStart(2,"0")+"-01";
+    const last  = new Date(dy, dm+1, 0);
+    const end   = dy+"-"+String(dm+1).padStart(2,"0")+"-"+String(last.getDate()).padStart(2,"0");
+    const prefix = i===0?"This Month: ":i===1?"Next Month: ":"";
+    const o = document.createElement("option");
+    o.value = start+"|"+end;
+    o.textContent = prefix+monthNames[dm]+" "+dy;
+    grpM.appendChild(o);
+  }
+  sel.appendChild(grpM);
+
+  // --- Salesforce FQ options (current + 2 ahead) ---
+  // SF FQ starts: Q1=Feb1, Q2=May1, Q3=Aug1, Q4=Nov1
+  let curStart;
+  if(m===0)      curStart = new Date(y-1,10,1);  // Jan → Q4 started Nov prev year
+  else if(m<=3)  curStart = new Date(y, 1,1);    // Feb-Apr → Q1
+  else if(m<=6)  curStart = new Date(y, 4,1);    // May-Jul → Q2
+  else if(m<=9)  curStart = new Date(y, 7,1);    // Aug-Oct → Q3
+  else           curStart = new Date(y,10,1);    // Nov-Dec → Q4
+
+  const grpQ = document.createElement("optgroup");
+  grpQ.label = "Salesforce Quarter (FQ)";
+  const fqPrefixes = ["This FQ","Next FQ","FQ+2"];
+  for(let i=0; i<3; i++){
+    const qs  = new Date(curStart.getFullYear(), curStart.getMonth()+i*3, 1);
+    const qe  = new Date(qs.getFullYear(), qs.getMonth()+3, 0);
+    const qsm = qs.getMonth();
+    const qNum = qsm===1?1:qsm===4?2:qsm===7?3:4;
+    const fyNum = qe.getMonth()===0 ? qe.getFullYear() : qe.getFullYear()+1;
+    const start = qs.getFullYear()+"-"+String(qs.getMonth()+1).padStart(2,"0")+"-01";
+    const end   = qe.getFullYear()+"-"+String(qe.getMonth()+1).padStart(2,"0")+"-"+String(qe.getDate()).padStart(2,"0");
+    const o = document.createElement("option");
+    o.value = start+"|"+end;
+    o.textContent = fqPrefixes[i]+": Q"+qNum+" FY"+String(fyNum).slice(2)+" ("+monthNames[qs.getMonth()]+"–"+monthNames[qe.getMonth()]+")";
+    grpQ.appendChild(o);
+  }
+  sel.appendChild(grpQ);
+}
+
 
 function buildSummary(rows){
   const total  = rows.length;
@@ -386,13 +443,15 @@ function buildMgrGrid(rows){
 }
 
 function getFiltered(){
-  const mgr  = document.getElementById("fMgr").value;
-  const stg  = document.getElementById("fStage").value;
-  const fc   = document.getElementById("fForecast").value;
-  const miss = document.getElementById("fMissing").value;
-  const risk = document.getElementById("fRisk").value;
-  const srch = document.getElementById("fSearch").value.toLowerCase();
-  const tier = document.getElementById("fTier").value;
+  const mgr   = document.getElementById("fMgr").value;
+  const stg   = document.getElementById("fStage").value;
+  const fc    = document.getElementById("fForecast").value;
+  const miss  = document.getElementById("fMissing").value;
+  const risk  = document.getElementById("fRisk").value;
+  const srch  = document.getElementById("fSearch").value.toLowerCase();
+  const tier  = document.getElementById("fTier").value;
+  const close = document.getElementById("fClose").value;
+  const [closeStart, closeEnd] = close ? close.split("|") : [null, null];
   return RAW.filter(r=>{
     if(tier && tierOf(r.amount) !== tier) return false;
     if(mgr  && r.manager  !== mgr)  return false;
@@ -406,6 +465,7 @@ function getFiltered(){
     if(risk==="stale"   && r.daysInStage<=90)  return false;
     if(risk==="low"     && r.agentScore>2)     return false;
     if(risk==="redflag" && !r.redFlags)        return false;
+    if(closeStart && (!r.close || r.close < closeStart || r.close > closeEnd)) return false;
     if(srch && !r.name.toLowerCase().includes(srch)
             && !r.account.toLowerCase().includes(srch)
             && !r.owner.toLowerCase().includes(srch)) return false;
@@ -592,17 +652,18 @@ function sortBy(col){
   renderTable();
 }
 function resetFilters(){
-  ["fMgr","fTier","fStage","fForecast","fMissing","fRisk"].forEach(id=>document.getElementById(id).value="");
+  ["fMgr","fTier","fStage","fForecast","fMissing","fRisk","fClose"].forEach(id=>document.getElementById(id).value="");
   document.getElementById("fSearch").value="";
   renderTable();
 }
-["fMgr","fTier","fStage","fForecast","fMissing","fRisk","fSearch"].forEach(id=>{
+["fMgr","fTier","fStage","fForecast","fMissing","fRisk","fClose","fSearch"].forEach(id=>{
   const el = document.getElementById(id);
   el.addEventListener("change", renderTable);
   el.addEventListener("input",  renderTable);
 });
 
 populateStageFilter();
+populateCloseFilter();
 renderTable();
 
 // Tab switching
