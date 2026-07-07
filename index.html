@@ -347,11 +347,13 @@ function populateCloseFilter(){
   const y = now.getFullYear();
   const m = now.getMonth(); // 0-indexed
 
-  // --- Monthly options (next 6 months) ---
+  // --- Monthly options: current month through Jan 2027 (final month of FY27) ---
   const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const grpM = document.createElement("optgroup");
   grpM.label = "Monthly";
-  for(let i=0; i<6; i++){
+  const monthsToJan27 = (2027 - y) * 12 + (0 - m) + 1; // inclusive count to Jan 2027
+  const monthCount = Math.max(monthsToJan27, 1);
+  for(let i=0; i<monthCount; i++){
     const d = new Date(y, m+i, 1);
     const dy = d.getFullYear(), dm = d.getMonth();
     const start = dy+"-"+String(dm+1).padStart(2,"0")+"-01";
@@ -391,6 +393,15 @@ function populateCloseFilter(){
     grpQ.appendChild(o);
   }
   sel.appendChild(grpQ);
+
+  // --- FY28: Feb 2027 – Jan 2028 ---
+  const grpFY = document.createElement("optgroup");
+  grpFY.label = "Fiscal Year";
+  const oFY28 = document.createElement("option");
+  oFY28.value = "2027-02-01|2028-01-31";
+  oFY28.textContent = "FY28 (Feb ’27 – Jan ’28)";
+  grpFY.appendChild(oFY28);
+  sel.appendChild(grpFY);
 }
 
 
