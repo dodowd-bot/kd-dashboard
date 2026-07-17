@@ -394,13 +394,17 @@ function populateCloseFilter(){
   }
   sel.appendChild(grpQ);
 
-  // --- FY28: Feb 2027 – Jan 2028 ---
+  // --- Fiscal Years: FY28 + FY29 ---
   const grpFY = document.createElement("optgroup");
   grpFY.label = "Fiscal Year";
   const oFY28 = document.createElement("option");
   oFY28.value = "2027-02-01|2028-01-31";
-  oFY28.textContent = "FY28 (Feb ’27 – Jan ’28)";
+  oFY28.textContent = "FY28 (Feb ‘27 – Jan ‘28)";
   grpFY.appendChild(oFY28);
+  const oFY29 = document.createElement("option");
+  oFY29.value = "2028-02-01|2029-01-31";
+  oFY29.textContent = "FY29 (Feb ‘28 – Jan ‘29)";
+  grpFY.appendChild(oFY29);
   sel.appendChild(grpFY);
 }
 
